@@ -79,77 +79,96 @@ document.addEventListener('DOMContentLoaded',()=>{
       return payload.sub || null;
     }catch(e){ return null; }
   }
-  function localAddStore(name, description){
+  // Try to parse a JWT (no verification) to extract payload fields like sub/email.
+  function parseJwt(token){
+    if(!token) return null;
+    try{
+      const parts = token.split('.');
+      if(parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1]));
+      return payload;
+    }catch(e){ return null; }
+  }
+
+  // Local/demo store creation. Accept optional ownerId/ownerEmail so stores saved during
+  // a server outage can still be associated with the authenticated account.
+  function localAddStore(name, description, ownerId=null, ownerEmail=null){
     name = (name||'').toString().trim();
     description = (description||'').toString().trim();
     if(!name) return false;
     const stores = readLocalStores();
-    const ownerEmail = parseLocalTokenEmail();
+    const localTokenEmail = parseLocalTokenEmail();
     const id = 'localstore:'+Date.now()+':'+Math.floor(Math.random()*1000);
-    const store = { id, ownerId: ownerEmail ? ('local:'+ownerEmail) : id, ownerEmail: ownerEmail, name, description, status: 'pending', createdAt: Date.now() };
+    // Determine owner fields: prefer explicit args, then local token, else use generated id.
+    const finalOwnerEmail = ownerEmail || localTokenEmail || null;
+    const finalOwnerId = ownerId || (finalOwnerEmail ? ('local:'+finalOwnerEmail) : id);
+    const store = { id, ownerId: finalOwnerId, ownerEmail: finalOwnerEmail, name, description, status: 'pending', createdAt: Date.now() };
     stores.push(store);
     writeLocalStores(stores);
     return true;
   }
 
 
-  function updateAuthUI(){
-    // If using local token, load local stores
+  async function updateAuthUI(){
     const token = getToken();
-    if(token && token.startsWith('local.')){
-      const local = readLocalStores();
-      if(!storesList) return;
-      if(!Array.isArray(local) || local.length === 0){
-        storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>';
-        return;
-      }
-      storesList.innerHTML = '';
-      local.forEach(s=>{
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.style.marginBottom = '8px';
-        el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
-        storesList.appendChild(el);
-      });
-      return;
+    const isLocal = token && token.startsWith('local.');
+
+    // Toggle primary nav buttons
+    if(isLocal || token){
+      loginBtn.style.display = 'none';
+      signupBtn.style.display = 'none';
+      addStoreBtn.style.display = 'inline-block';
+      logoutBtn.style.display = 'inline-block';
+      storesSection.style.display = 'block';
+    } else {
+      loginBtn.style.display = 'inline-block';
+      signupBtn.style.display = 'inline-block';
+      addStoreBtn.style.display = 'none';
+      logoutBtn.style.display = 'none';
+      storesSection.style.display = 'none';
     }
 
-    try{
-      const res = await fetch(API('/stores/my'), { headers: authHeaders() });
-      const data = await res.json();
-      // Render stores
-      if(!storesList) return;
-      if(!Array.isArray(data) || data.length === 0){
-        storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>';
-        return;
+    // Load stores for the current user (server or local)
+    await loadStores();
+
+    // Admin UI: only available for server-backed sessions
+    if(isLocal){
+      document.getElementById('admin-panel').style.display = 'none';
+    } else if(token){
+      try{
+        const me = await loadMe();
+        if(me && me.isAdmin){
+          document.getElementById('admin-panel').style.display = 'block';
+          await loadPendingStores();
+        } else {
+          document.getElementById('admin-panel').style.display = 'none';
+        }
+      }catch(err){
+        console.warn('Failed to load /me for admin status', err);
+        document.getElementById('admin-panel').style.display = 'none';
       }
-      storesList.innerHTML = '';
-      data.forEach(s=>{
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.style.marginBottom = '8px';
-        el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
-        storesList.appendChild(el);
-      });
-    }catch(err){
-      console.warn('Failed to load stores from server, loading local stores as fallback', err);
-      const local = readLocalStores();
-      if(!storesList) return;
-      if(!Array.isArray(local) || local.length === 0){
-        storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>';
-        return;
-      }
-      storesList.innerHTML = '';
-      local.forEach(s=>{
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.style.marginBottom = '8px';
-        el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
-        storesList.appendChild(el);
-      });
+    } else {
+      document.getElementById('admin-panel').style.display = 'none';
     }
-      const pending = document.getElementById('pendingStoresList');
-      if(!pending) return;
+  }
+
+  // Load current user info
+  async function loadMe(){
+    try{
+      const res = await fetch(API('/me'), { headers: authHeaders() });
+      if(!res.ok) return null;
+      return await res.json();
+    }catch(err){ return null; }
+  }
+
+  // Load pending stores (admin)
+  async function loadPendingStores(){
+    const pending = document.getElementById('pendingStoresList');
+    if(!pending) return;
+    try{
+      const res = await fetch(API('/stores/pending'), { headers: authHeaders() });
+      if(!res.ok){ pending.innerHTML = '<p class="muted">No pending stores.</p>'; return; }
+      const data = await res.json();
       if(!Array.isArray(data) || data.length === 0){ pending.innerHTML = '<p class="muted">No pending stores.</p>'; return; }
       pending.innerHTML = '';
       data.forEach(s=>{
@@ -174,7 +193,10 @@ document.addEventListener('DOMContentLoaded',()=>{
         el.appendChild(btnWrap);
         pending.appendChild(el);
       });
-    }catch(err){ console.error('loadPendingStores', err); }
+    }catch(err){
+      console.error('loadPendingStores', err);
+      pending.innerHTML = '<p class="muted">No pending stores.</p>';
+    }
   }
 
   async function approveStore(id){
@@ -283,9 +305,21 @@ document.addEventListener('DOMContentLoaded',()=>{
       }
     }catch(err){
       console.warn('Add store network error, saving locally as demo fallback', err);
-      const ok = localAddStore(payload.name, payload.description);
-      if(ok){ closeModal(addStoreModal); addStoreForm.reset(); alert('Store saved locally (demo fallback)'); loadStores(); }
-      else alert('Failed to save local store');
+      try{
+        const token = getToken();
+        if(token && !token.startsWith('local.')){
+          const parsed = parseJwt(token);
+          const ownerId = parsed && parsed.sub ? parsed.sub : null;
+          const ownerEmail = parsed && parsed.email ? parsed.email : null;
+          const ok = localAddStore(payload.name, payload.description, ownerId, ownerEmail);
+          if(ok){ closeModal(addStoreModal); addStoreForm.reset(); alert('Store saved locally (demo fallback)'); loadStores(); }
+          else alert('Failed to save local store');
+        } else {
+          const ok = localAddStore(payload.name, payload.description);
+          if(ok){ closeModal(addStoreModal); addStoreForm.reset(); alert('Store saved locally (demo fallback)'); loadStores(); }
+          else alert('Failed to save local store');
+        }
+      }catch(ferr){ console.error('local fallback failed', ferr); alert('Failed to save local store'); }
     }
   });
 
@@ -308,8 +342,45 @@ document.addEventListener('DOMContentLoaded',()=>{
         el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
         storesList.appendChild(el);
       });
-    }catch(err){ console.error(err); }
+    }catch(err){
+      console.warn('Failed to load stores from server, falling back to local stores', err);
+      // Fallback: load local stores for the current user only
+      try{
+        const token = getToken();
+        let local = readLocalStores() || [];
+        if(token && token.startsWith('local.')){
+          const ownerEmail = parseLocalTokenEmail();
+          if(ownerEmail){ local = local.filter(s => s.ownerEmail === ownerEmail || s.ownerId === ('local:'+ownerEmail)); }
+          else local = [];
+        } else if(token){
+          const parsed = parseJwt(token);
+          const ownerId = parsed && parsed.sub ? parsed.sub : null;
+          const ownerEmail = parsed && parsed.email ? parsed.email : null;
+          if(ownerId || ownerEmail){
+            local = local.filter(s => (ownerId && s.ownerId === ownerId) || (ownerEmail && s.ownerEmail === ownerEmail));
+          } else local = [];
+        } else {
+          // no token: show nothing for private stores
+          local = [];
+        }
+
+        if(!storesList) return;
+        if(!Array.isArray(local) || local.length === 0){
+          storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>';
+          return;
+        }
+        storesList.innerHTML = '';
+        local.forEach(s=>{
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.style.marginBottom = '8px';
+          el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
+          storesList.appendChild(el);
+        });
+      }catch(fall){ console.error('Local stores load failed', fall); storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>'; }
+    }
   }
+
 
   // Simulate API request (existing code preserved)
   const sendSample = document.getElementById('sendSample');

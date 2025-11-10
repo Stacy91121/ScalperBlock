@@ -9,10 +9,20 @@
 <body>
     <header class="site-header">
         <div class="container header-inner">
-            <a class="brand" href="#">
-                <img src="photos/SBLogo.png" alt="ScalperBlock logo" class="logo" />
-                <span>ScalperBlock</span>
-            </a>
+                        <a class="brand" href="#">
+                                <!-- Inline SVG logo so the app shows a logo even if image files are missing -->
+                                <svg class="logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ScalperBlock logo">
+                                    <defs>
+                                        <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+                                            <stop offset="0%" stop-color="#2563eb"/>
+                                            <stop offset="100%" stop-color="#06b6d4"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="48" height="48" rx="8" fill="url(#g1)" />
+                                    <text x="50%" y="55%" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="20" fill="white" text-anchor="middle">SB</text>
+                                </svg>
+                                <span>ScalperBlock</span>
+                        </a>
             <nav class="nav">
                 <button id="loginBtn" class="btn btn-outline">Log in</button>
                 <button id="signupBtn" class="btn btn-primary">Sign up</button>
