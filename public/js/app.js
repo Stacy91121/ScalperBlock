@@ -30,6 +30,77 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Use API('/signup') -> '/api/signup' or 'http://localhost:3000/api/signup' when opened from filesystem
   const API = (path) => `${BASE}/api${path}`;
 
+  // ----- Bot Detection: Behavioral Tracking -----
+  const trackingData = {
+    mouse_movements: [],
+    keystrokes: [],
+    page_load_time: performance.now(),
+    time_on_page: null,
+    form_submission_time: null,
+    navigation_pattern: [],
+    screen_resolution: { width: window.screen.width, height: window.screen.height },
+    user_agent: navigator.userAgent,
+  };
+
+  // Sample mouse movements every 50ms to avoid overwhelming the server
+  document.addEventListener('mousemove', (event) => {
+    const now = performance.now();
+    const lastMove = trackingData.mouse_movements.at(-1);
+    if (!lastMove || (now - lastMove.timestamp > 50)) {
+      trackingData.mouse_movements.push({
+        x: event.clientX,
+        y: event.clientY,
+        timestamp: now,
+      });
+    }
+  });
+
+  // Track keystrokes (timing and frequency)
+  document.addEventListener('keydown', (event) => {
+    trackingData.keystrokes.push({
+      key: event.key,
+      timestamp: performance.now(),
+    });
+  });
+
+  // Track navigation/clicks on elements
+  document.addEventListener('click', (event) => {
+    trackingData.navigation_pattern.push({
+      element_id: event.target.id || event.target.tagName,
+      timestamp: performance.now(),
+    });
+  });
+
+  // Helper: send tracking data to server
+  async function sendTrackingData(context = 'unknown') {
+    try {
+      trackingData.form_submission_time = performance.now();
+      trackingData.time_on_page = trackingData.form_submission_time - trackingData.page_load_time;
+      const payload = { ...trackingData, context };
+      const res = await fetch(API('/track-behavior'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      console.log('Tracking data sent:', result);
+      return result;
+    } catch (err) {
+      console.warn('Failed to send tracking data:', err);
+      return null;
+    }
+  }
+
+  // Helper: reset tracking data for next form submission
+  function resetTrackingData() {
+    trackingData.mouse_movements = [];
+    trackingData.keystrokes = [];
+    trackingData.navigation_pattern = [];
+    trackingData.page_load_time = performance.now();
+    trackingData.form_submission_time = null;
+    trackingData.time_on_page = null;
+  }
+
   // Auth helpers
   function setToken(t){ if(t) localStorage.setItem('sb_token', t); else localStorage.removeItem('sb_token'); updateAuthUI(); }
   function getToken(){ return localStorage.getItem('sb_token'); }
@@ -223,6 +294,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     e.preventDefault();
     const form = new FormData(signupForm);
     const payload = { email: form.get('email'), password: form.get('password') };
+    
+    // Capture tracking data before submission
+    await sendTrackingData('signup');
+    resetTrackingData();
+    
     try{
       const res = await fetch(API('/signup'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const data = await res.json();
@@ -254,6 +330,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     e.preventDefault();
     const form = new FormData(loginForm);
     const payload = { email: form.get('email'), password: form.get('password') };
+    
+    // Capture tracking data before submission
+    await sendTrackingData('login');
+    resetTrackingData();
+    
     try{
       const res = await fetch(API('/login'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const data = await res.json();
@@ -286,6 +367,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     e.preventDefault();
     const form = new FormData(addStoreForm);
     const payload = { name: form.get('name'), description: form.get('description') };
+    
+    // Capture tracking data before submission
+    await sendTrackingData('add_store');
+    resetTrackingData();
+    
     // If using local demo token, create store locally
     const token = getToken();
     if(token && token.startsWith('local.')){

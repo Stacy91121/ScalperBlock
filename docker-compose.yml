@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: scalperblock_postgres
+    environment:
+      POSTGRES_USER: scalperblock
+      POSTGRES_PASSWORD: secure_password_dev
+      POSTGRES_DB: scalperblock_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/scalperblock_schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scalperblock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: scalperblock_api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: scalperblock
+      DB_PASSWORD: secure_password_dev
+      DB_NAME: scalperblock_db
+      API_SECRET: dev-secret-key-docker
+      SB_ADMIN_EMAIL: admin@scalperblock.io
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm start
+
+  # Optional: Redis for caching velocity tracking (production)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  postgres_data:

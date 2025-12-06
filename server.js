@@ -200,4 +200,121 @@ app.get('/api/stores/pending', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
+// POST /api/track-behavior (bot detection analysis)
+app.post('/api/track-behavior', async (req, res) => {
+  try {
+    const { mouse_movements, keystrokes, navigation_pattern, time_on_page, context, screen_resolution, user_agent } = req.body || {};
+    
+    // Initialize risk score
+    let risk_score = 0;
+    const breakdown = {};
+
+    // 1. Analyze mouse movements (human-like motion = curved, variable speed)
+    if (Array.isArray(mouse_movements) && mouse_movements.length > 0) {
+      let straight_distance = 0;
+      let actual_distance = 0;
+      for (let i = 1; i < mouse_movements.length; i++) {
+        const prev = mouse_movements[i - 1];
+        const curr = mouse_movements[i];
+        const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
+        actual_distance += Math.sqrt(dx * dx + dy * dy);
+      }
+      const straight_dist = Math.sqrt(
+        (mouse_movements[mouse_movements.length - 1].x - mouse_movements[0].x) ** 2 +
+        (mouse_movements[mouse_movements.length - 1].y - mouse_movements[0].y) ** 2
+      );
+      straight_distance = straight_dist;
+      
+      // Straightness ratio: close to 1 = suspicious (direct path), > 1 = human (curved path)
+      const straightness = straight_distance > 0 ? actual_distance / straight_distance : 1;
+      const movement_score = straightness < 1.2 ? 25 : (straightness < 1.5 ? 10 : 0);
+      risk_score += movement_score;
+      breakdown.mouse_movement_score = movement_score;
+
+      // Check movement count: too few = bot, too many/realistic = human
+      const movement_count_score = mouse_movements.length < 5 ? 15 : 0;
+      risk_score += movement_count_score;
+      breakdown.movement_count_score = movement_count_score;
+    } else {
+      // No mouse movements = suspicious
+      risk_score += 35;
+      breakdown.mouse_movement_score = 35;
+    }
+
+    // 2. Analyze keystrokes (timing patterns)
+    if (Array.isArray(keystrokes) && keystrokes.length > 0) {
+      let keystroke_intervals = [];
+      for (let i = 1; i < keystrokes.length; i++) {
+        keystroke_intervals.push(keystrokes[i].timestamp - keystrokes[i - 1].timestamp);
+      }
+      const avg_interval = keystroke_intervals.reduce((a, b) => a + b, 0) / keystroke_intervals.length;
+      const variance = keystroke_intervals.reduce((sum, interval) => sum + (interval - avg_interval) ** 2, 0) / keystroke_intervals.length;
+
+      // Low variance = suspicious (bot-like consistency), high variance = human (natural variation)
+      const keystroke_consistency_score = variance < 50 ? 20 : (variance < 150 ? 8 : 0);
+      risk_score += keystroke_consistency_score;
+      breakdown.keystroke_consistency_score = keystroke_consistency_score;
+
+      // Check for unnatural typing speed (too fast)
+      const too_fast_keystrokes = keystroke_intervals.filter(interval => interval < 50).length;
+      const speed_score = too_fast_keystrokes > keystroke_intervals.length * 0.5 ? 15 : 0;
+      risk_score += speed_score;
+      breakdown.typing_speed_score = speed_score;
+    } else {
+      // No keystrokes = suspicious
+      risk_score += 30;
+      breakdown.keystroke_score = 30;
+    }
+
+    // 3. Analyze navigation/interaction patterns
+    if (Array.isArray(navigation_pattern) && navigation_pattern.length > 0) {
+      // Too few clicks/interactions = suspicious
+      const interaction_count_score = navigation_pattern.length < 3 ? 10 : 0;
+      risk_score += interaction_count_score;
+      breakdown.interaction_count_score = interaction_count_score;
+
+      // Check for repeated identical element interactions (bot-like)
+      const element_map = {};
+      navigation_pattern.forEach(click => {
+        element_map[click.element_id] = (element_map[click.element_id] || 0) + 1;
+      });
+      const max_repetitions = Math.max(...Object.values(element_map));
+      const repetition_score = max_repetitions > 3 ? 12 : 0;
+      risk_score += repetition_score;
+      breakdown.repetition_score = repetition_score;
+    } else {
+      // No interactions = suspicious
+      risk_score += 20;
+      breakdown.interaction_score = 20;
+    }
+
+    // 4. Analyze time on page
+    const time_on_page_score = (time_on_page < 1000 || time_on_page > 120000) ? 10 : 0;
+    risk_score += time_on_page_score;
+    breakdown.time_on_page_score = time_on_page_score;
+
+    // Determine recommended action
+    let recommended_action = 'ALLOW';
+    if (risk_score >= 80) {
+      recommended_action = 'BLOCK';
+    } else if (risk_score >= 50) {
+      recommended_action = 'CHALLENGE';
+    }
+
+    // Log the analysis
+    console.log(`Bot detection (${context}): risk_score=${risk_score}, action=${recommended_action}`, breakdown);
+
+    res.json({
+      risk_score: Math.min(100, risk_score),
+      recommended_action,
+      breakdown,
+      context,
+    });
+  } catch (err) {
+    console.error('Track behavior error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.listen(PORT, ()=> console.log(`ScalperBlock demo API running on http://localhost:${PORT}`));
