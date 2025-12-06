@@ -34,119 +34,145 @@
     </header>
 
     <main>
-        <!-- Updated hero copy: friendlier, user-focused -->
-        <section class="hero">
+        <!-- Welcome screen (shown when logged out) -->
+        <section id="welcome-screen" class="hero">
             <div class="container hero-inner">
                 <div class="hero-copy">
-                    <h1>ScalperBlock — Give real customers a fair chance</h1>
-                    <p class="lead">ScalperBlock helps online sellers keep high-demand items available for real people, not bots or resellers. We watch checkout signals in real time and deliver an easy-to-understand risk score and a recommended action so merchants can protect inventory without interrupting genuine buyers.</p>
+                    <h1>Stop bots. Protect inventory. Serve real customers.</h1>
+                    <p class="lead">ScalperBlock detects scalpers and bots in real-time using advanced behavioral analysis. Get instant risk scores and protect your high-demand products from automated resellers.</p>
                     <div class="hero-cta">
-                        <a href="#api" class="btn btn-primary">View API</a>
-                        <a href="#features" class="btn btn-outline">Features</a>
+                        <button id="getStartedBtn" class="btn btn-primary">Get Started</button>
+                        <button id="learnMoreBtn" class="btn btn-outline">Learn More</button>
                     </div>
                 </div>
                 <div class="hero-illustration">
                     <div class="card mock-dashboard">
-                        <h3>Merchant Dashboard</h3>
+                        <h3>Live Protection Stats</h3>
                         <ul>
-                            <li>Live requests: <strong>128</strong></li>
-                            <li>Avg latency: <strong>34ms</strong></li>
-                            <li>Alerts: <strong>2</strong></li>
+                            <li>Requests analyzed: <strong>12,847</strong></li>
+                            <li>Bots blocked: <strong>1,203</strong></li>
+                            <li>Response time: <strong>28ms</strong></li>
                         </ul>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- My Stores (shown after login) -->
-        <section id="my-stores" class="container" style="display:none;">
-            <h2>My Stores</h2>
-            <div id="storesList">
-                <p class="muted">No stores yet. Use "Add Store" to create one.</p>
+        <!-- Dashboard (shown after login) -->
+        <section id="dashboard" class="container" style="display:none;">
+            <div class="dashboard-header">
+                <div>
+                    <h2>Dashboard</h2>
+                    <p class="muted">Monitor your stores and analyze transaction risk in real-time</p>
+                </div>
+                <button id="addStoreBtn2" class="btn btn-primary">+ Add Store</button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Stores</div>
+                    <div class="stat-value" id="totalStores">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Requests Today</div>
+                    <div class="stat-value" id="requestsToday">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Threats Blocked</div>
+                    <div class="stat-value" id="threatsBlocked">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Risk Score</div>
+                    <div class="stat-value" id="avgRiskScore">--</div>
+                </div>
+            </div>
+
+            <!-- My Stores -->
+            <div class="section-card">
+                <h3>My Stores</h3>
+                <div id="storesList">
+                    <p class="muted">No stores yet. Click "Add Store" to get started.</p>
+                </div>
+            </div>
+
+            <!-- API Testing Tool -->
+            <div class="section-card">
+                <h3>Test API</h3>
+                <p class="muted">Simulate a transaction check to see how ScalperBlock analyzes risk</p>
+                
+                <div class="api-tester">
+                    <div class="input-group">
+                        <label>IP Address</label>
+                        <input type="text" id="testIp" value="198.51.100.12" />
+                    </div>
+                    <div class="input-group">
+                        <label>Session ID</label>
+                        <input type="text" id="testSession" value="sess-demo-001" />
+                    </div>
+                    <div class="input-group">
+                        <label>Checkout Speed (ms)</label>
+                        <input type="number" id="testSpeed" value="1500" />
+                    </div>
+                    <button id="runTestBtn" class="btn btn-primary">Run Test</button>
+                </div>
+
+                <div id="testResults" style="display:none;">
+                    <h4>Results</h4>
+                    <div class="result-display">
+                        <div class="result-item">
+                            <span>Risk Score:</span>
+                            <strong id="resultScore">--</strong>
+                        </div>
+                        <div class="result-item">
+                            <span>Action:</span>
+                            <strong id="resultAction" class="badge">--</strong>
+                        </div>
+                    </div>
+                    <details class="breakdown-details">
+                        <summary>View Breakdown</summary>
+                        <pre id="resultBreakdown" class="code"></pre>
+                    </details>
+                </div>
             </div>
         </section>
 
         <!-- Admin panel (visible only to admin users) -->
-        <section id="admin-panel" class="container" style="display:none;margin-top:18px;">
-            <h2>Admin — Pending Stores</h2>
-            <div id="pendingStoresList">
-                <p class="muted">No pending stores.</p>
+        <section id="admin-panel" class="container" style="display:none;">
+            <h2>Admin Panel</h2>
+            <div class="section-card">
+                <h3>Pending Store Approvals</h3>
+                <div id="pendingStoresList">
+                    <p class="muted">No pending stores.</p>
+                </div>
             </div>
         </section>
 
-        <!-- Updated features: plain language summaries -->
-        <section id="features" class="container features">
-            <h2>Core Capabilities</h2>
+        <!-- Features section (shown when logged out) -->
+        <section id="features-section" class="container features">
+            <h2>How It Works</h2>
             <div class="cards">
                 <div class="card">
-                    <h3>Clear, fast scoring</h3>
-                    <p>Receive a simple risk score (0–100) and a suggested action (ALLOW, CHALLENGE, BLOCK) so you can respond automatically or review cases quickly.</p>
+                    <div class="card-icon">🎯</div>
+                    <h3>Instant Risk Scoring</h3>
+                    <p>Every transaction gets a 0-100 risk score in under 100ms. Know immediately if a purchase is legitimate or suspicious.</p>
                 </div>
                 <div class="card">
-                    <h3>Multiple signals combined</h3>
-                    <p>We blend IP reputation, request patterns, browser signals, and checkout timing to spot automated or suspicious activity while minimizing disruption to real users.</p>
+                    <div class="card-icon">🤖</div>
+                    <h3>Bot Detection</h3>
+                    <p>Advanced behavioral analysis tracks mouse movements, keystrokes, and checkout patterns to identify automated behavior.</p>
                 </div>
                 <div class="card">
-                    <h3>Easy management</h3>
-                    <p>Tune rules, review flagged transactions, and capture merchant feedback to improve decisions over time — all from a simple interface.</p>
+                    <div class="card-icon">⚡</div>
+                    <h3>Real-Time Protection</h3>
+                    <p>Automatic actions based on risk level: allow legitimate customers, challenge suspicious ones, block clear threats.</p>
                 </div>
             </div>
-        </section>
-
-        <!-- Updated API intro: approachable explanation -->
-        <section id="api" class="container api-section">
-            <h2>API Example — </h2>
-            <p>Send a JSON transaction payload to get back a clear risk score and recommended action. The API is designed to be fast and easy to integrate; production use requires authentication (API key or JWT). Below is a sample request and a simulated response.</p>
-
-            <div class="api-box">
-                <div class="api-column">
-                    <h4>Request (JSON)</h4>
-                    <pre id="sampleRequest" class="code">
-{
-  "ip_address": "198.51.100.12",
-  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
-  "timestamp": 1699999999000,
-  "product_id": "SKU-1234",
-  "session_id": "sess-abc-001",
-  "checkout_speed_ms": 1500
-}
-                    </pre>
-                    <button id="sendSample" class="btn btn-primary">Simulate Request</button>
-                </div>
-                <div class="api-column">
-                    <h4>Sample Response</h4>
-                    <pre id="sampleResponse" class="code">
-{
-  "risk_score": 42,
-  "recommended_action": "ALLOW",
-  "breakdown": {
-    "ip_score": 10,
-    "velocity_score": 5,
-    "fingerprint_score": 12,
-    "behavior_score": 15
-  }
-}
-                    </pre>
-                </div>
-            </div>
-
-            <p class="muted">Latency target: &lt;100ms. Auth required for production.</p>
-        </section>
-
-        <!-- Updated architecture blurb: concise and user-friendly -->
-        <section class="container architecture">
-            <h2>Architecture & Diagrams</h2>
-            <p>Example backend: Java + Spring Boot for the API and scoring logic, with PostgreSQL for data. The design includes modular scoring components (IP reputation, velocity, fingerprinting, behavior), an admin area for adjusting rules, and logging for auditing and improvement.</p>
-            <ul>
-                <li><strong>Class diagram:</strong> ApiEndpoint → RiskScoringEngine → reputation/velocity/fingerprint providers</li>
-                <li><strong>DB:</strong> Users, Tasks, Items, Chats, Messages (relational)</li>
-            </ul>
-            <p>ScalperBlock<a href=target="_blank" rel="noopener"></a></p>
         </section>
 
         <footer class="site-footer">
             <div class="container">
-                <p>ScalperBlock 2025 Demo</p>
+                <p>&copy; 2025 ScalperBlock. Protecting real customers from scalpers and bots.</p>
             </div>
         </footer>
     </main>

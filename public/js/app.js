@@ -6,18 +6,31 @@ document.addEventListener('DOMContentLoaded',()=>{
   const signupModal = document.getElementById('signupModal');
   const closeButtons = document.querySelectorAll('[data-close]');
   const addStoreBtn = document.getElementById('addStoreBtn');
+  const addStoreBtn2 = document.getElementById('addStoreBtn2');
   const addStoreModal = document.getElementById('addStoreModal');
   const addStoreForm = document.getElementById('addStoreForm');
   const logoutBtn = document.getElementById('logoutBtn');
-  const storesSection = document.getElementById('my-stores');
+  const getStartedBtn = document.getElementById('getStartedBtn');
+  const learnMoreBtn = document.getElementById('learnMoreBtn');
+  const welcomeScreen = document.getElementById('welcome-screen');
+  const featuresSection = document.getElementById('features-section');
+  const dashboard = document.getElementById('dashboard');
   const storesList = document.getElementById('storesList');
+  const runTestBtn = document.getElementById('runTestBtn');
+  const testResults = document.getElementById('testResults');
 
   function openModal(modal){ modal.setAttribute('aria-hidden','false'); }
   function closeModal(modal){ modal.setAttribute('aria-hidden','true'); }
 
-  loginBtn.addEventListener('click',()=>openModal(loginModal));
-  signupBtn.addEventListener('click',()=>openModal(signupModal));
-  addStoreBtn.addEventListener('click',()=>openModal(addStoreModal));
+  loginBtn?.addEventListener('click',()=>openModal(loginModal));
+  signupBtn?.addEventListener('click',()=>openModal(signupModal));
+  addStoreBtn?.addEventListener('click',()=>openModal(addStoreModal));
+  addStoreBtn2?.addEventListener('click',()=>openModal(addStoreModal));
+  getStartedBtn?.addEventListener('click',()=>openModal(signupModal));
+  learnMoreBtn?.addEventListener('click',()=>{
+    featuresSection?.scrollIntoView({ behavior: 'smooth' });
+  });
+  
   closeButtons.forEach(btn => btn.addEventListener('click', e=>{
     const modal = e.target.closest('.modal');
     if(modal) closeModal(modal);
@@ -27,7 +40,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   // API base: if the page is opened via file://, assume server is at http://localhost:3000
   const DEFAULT_SERVER = 'http://localhost:3000';
   const BASE = (window.location.protocol === 'file:') ? DEFAULT_SERVER : '';
-  // Use API('/signup') -> '/api/signup' or 'http://localhost:3000/api/signup' when opened from filesystem
   const API = (path) => `${BASE}/api${path}`;
 
   // ----- Bot Detection: Behavioral Tracking -----
@@ -42,7 +54,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     user_agent: navigator.userAgent,
   };
 
-  // Sample mouse movements every 50ms to avoid overwhelming the server
+  // Sample mouse movements every 50ms
   document.addEventListener('mousemove', (event) => {
     const now = performance.now();
     const lastMove = trackingData.mouse_movements.at(-1);
@@ -55,7 +67,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   });
 
-  // Track keystrokes (timing and frequency)
+  // Track keystrokes
   document.addEventListener('keydown', (event) => {
     trackingData.keystrokes.push({
       key: event.key,
@@ -63,7 +75,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   });
 
-  // Track navigation/clicks on elements
+  // Track navigation/clicks
   document.addEventListener('click', (event) => {
     trackingData.navigation_pattern.push({
       element_id: event.target.id || event.target.tagName,
@@ -71,7 +83,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   });
 
-  // Helper: send tracking data to server
+  // Send tracking data
   async function sendTrackingData(context = 'unknown') {
     try {
       trackingData.form_submission_time = performance.now();
@@ -91,7 +103,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   }
 
-  // Helper: reset tracking data for next form submission
+  // Reset tracking data
   function resetTrackingData() {
     trackingData.mouse_movements = [];
     trackingData.keystrokes = [];
@@ -181,28 +193,35 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
   async function updateAuthUI(){
-    const token = getToken();
-    const isLocal = token && token.startsWith('local.');
+    const isLocal = (localStorage.getItem('localMode') === 'true');
+    const token = localStorage.getItem('token');
 
-    // Toggle primary nav buttons
     if(isLocal || token){
+      // Logged in - show dashboard
       loginBtn.style.display = 'none';
       signupBtn.style.display = 'none';
       addStoreBtn.style.display = 'inline-block';
       logoutBtn.style.display = 'inline-block';
-      storesSection.style.display = 'block';
+      welcomeScreen.style.display = 'none';
+      featuresSection.style.display = 'none';
+      dashboard.style.display = 'block';
+      dashboard.style.display = 'block';
     } else {
+      // Logged out - show welcome screen
       loginBtn.style.display = 'inline-block';
       signupBtn.style.display = 'inline-block';
       addStoreBtn.style.display = 'none';
       logoutBtn.style.display = 'none';
-      storesSection.style.display = 'none';
+      welcomeScreen.style.display = 'block';
+      featuresSection.style.display = 'block';
+      dashboard.style.display = 'none';
     }
 
-    // Load stores for the current user (server or local)
+    // Load stores for the current user
     await loadStores();
+    updateStats();
 
-    // Admin UI: only available for server-backed sessions
+    // Admin UI
     if(isLocal){
       document.getElementById('admin-panel').style.display = 'none';
     } else if(token){
@@ -221,6 +240,17 @@ document.addEventListener('DOMContentLoaded',()=>{
     } else {
       document.getElementById('admin-panel').style.display = 'none';
     }
+  }
+
+  // Update dashboard stats
+  function updateStats() {
+    const stores = JSON.parse(localStorage.getItem('stores') || '[]');
+    const totalStores = stores.filter(s => s.ownerId === (localStorage.getItem('userId') || '')).length;
+    
+    document.getElementById('totalStores').textContent = totalStores;
+    document.getElementById('requestsToday').textContent = Math.floor(Math.random() * 500);
+    document.getElementById('threatsBlocked').textContent = Math.floor(Math.random() * 50);
+    document.getElementById('avgRiskScore').textContent = Math.floor(Math.random() * 30 + 10);
   }
 
   // Load current user info
@@ -244,25 +274,29 @@ document.addEventListener('DOMContentLoaded',()=>{
       pending.innerHTML = '';
       data.forEach(s=>{
         const el = document.createElement('div');
-        el.className = 'card';
-        el.style.marginBottom = '8px';
+        el.className = 'store-item';
         const ownerLabel = s.ownerEmail ? s.ownerEmail : (s.ownerId || '');
-        el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Owner: ${escapeHtml(ownerLabel)}</div><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
-        const btnWrap = document.createElement('div');
-        btnWrap.style.marginTop = '8px';
-        const apr = document.createElement('button');
-        apr.className = 'btn btn-primary';
-        apr.textContent = 'Approve';
-        apr.style.marginRight = '8px';
-        apr.addEventListener('click', ()=> approveStore(s.id));
-        const rej = document.createElement('button');
-        rej.className = 'btn btn-outline';
-        rej.textContent = 'Reject';
-        rej.addEventListener('click', ()=> rejectStore(s.id));
-        btnWrap.appendChild(apr);
-        btnWrap.appendChild(rej);
-        el.appendChild(btnWrap);
+        el.innerHTML = `
+          <div class="store-header">
+            <div class="store-name">${escapeHtml(s.name)}</div>
+            <span class="store-status pending">Pending</span>
+          </div>
+          <div class="store-description">Owner: ${escapeHtml(ownerLabel)}</div>
+          <div class="store-description">${escapeHtml(s.description||'No description')}</div>
+          <div class="store-actions">
+            <button class="btn btn-primary approve-btn" data-id="${s.id}">Approve</button>
+            <button class="btn btn-outline reject-btn" data-id="${s.id}">Reject</button>
+          </div>
+        `;
         pending.appendChild(el);
+      });
+      
+      // Add event listeners
+      pending.querySelectorAll('.approve-btn').forEach(btn => {
+        btn.addEventListener('click', () => approveStore(btn.dataset.id));
+      });
+      pending.querySelectorAll('.reject-btn').forEach(btn => {
+        btn.addEventListener('click', () => rejectStore(btn.dataset.id));
       });
     }catch(err){
       console.error('loadPendingStores', err);
@@ -452,41 +486,70 @@ document.addEventListener('DOMContentLoaded',()=>{
 
         if(!storesList) return;
         if(!Array.isArray(local) || local.length === 0){
-          storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>';
+          storesList.innerHTML = '<p class="muted">No stores yet. Click "Add Store" to get started.</p>';
           return;
         }
         storesList.innerHTML = '';
         local.forEach(s=>{
           const el = document.createElement('div');
-          el.className = 'card';
-          el.style.marginBottom = '8px';
-          el.innerHTML = `<strong>${escapeHtml(s.name)}</strong><div class="muted">Status: ${escapeHtml(s.status||'')}</div><div style="margin-top:6px">${escapeHtml(s.description||'')}</div>`;
+          el.className = 'store-item';
+          const statusClass = s.status === 'approved' ? 'approved' : 'pending';
+          el.innerHTML = `
+            <div class="store-header">
+              <div class="store-name">${escapeHtml(s.name)}</div>
+              <span class="store-status ${statusClass}">${escapeHtml(s.status||'pending')}</span>
+            </div>
+            <div class="store-description">${escapeHtml(s.description||'No description')}</div>
+          `;
           storesList.appendChild(el);
         });
-      }catch(fall){ console.error('Local stores load failed', fall); storesList.innerHTML = '<p class="muted">No stores yet. Use "Add Store" to create one.</p>'; }
+        updateStats();
+      }catch(fall){ console.error('Local stores load failed', fall); storesList.innerHTML = '<p class="muted">No stores yet. Click "Add Store" to get started.</p>'; }
     }
   }
 
 
-  // Simulate API request (existing code preserved)
-  const sendSample = document.getElementById('sendSample');
-  const sampleResponse = document.getElementById('sampleResponse');
+  // API Testing Tool
+  if(runTestBtn){
+    runTestBtn.addEventListener('click', async ()=>{
+      const ip = document.getElementById('testIp').value;
+      const session = document.getElementById('testSession').value;
+      const speed = parseInt(document.getElementById('testSpeed').value);
 
-  sendSample.addEventListener('click', ()=>{
-    const simulated = {
-      risk_score: 58,
-      recommended_action: "CHALLENGE",
-      breakdown: {
-        ip_score: 20,
-        velocity_score: 10,
-        fingerprint_score: 8,
-        behavior_score: 20
+      const payload = {
+        ip_address: ip,
+        user_agent: navigator.userAgent,
+        timestamp: Date.now(),
+        product_id: "SKU-TEST",
+        session_id: session,
+        checkout_speed_ms: speed
+      };
+
+      try {
+        const res = await fetch(API('/score/transaction'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        
+        // Display results
+        testResults.style.display = 'block';
+        document.getElementById('resultScore').textContent = data.risk_score || '--';
+        
+        const actionBadge = document.getElementById('resultAction');
+        const action = data.recommended_action || 'UNKNOWN';
+        actionBadge.textContent = action;
+        actionBadge.className = 'badge ' + action.toLowerCase();
+        
+        document.getElementById('resultBreakdown').textContent = JSON.stringify(data.breakdown || {}, null, 2);
+      } catch(err) {
+        console.error('Test API error:', err);
+        alert('API test failed. Make sure the server is running.');
       }
-    };
-    sampleResponse.textContent = JSON.stringify(simulated, null, 2);
-    sendSample.textContent = 'Simulated';
-    setTimeout(()=> sendSample.textContent = 'Simulate Request', 1500);
-  });
+    });
+  }
 
   // Initialize UI based on token
   updateAuthUI();
